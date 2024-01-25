@@ -1,0 +1,8 @@
+/.venv
+/.vscode
+/forest_data.c
+/forest_data.h
+/output
+/temp_forest.csv
+/temp_forest.meta
+/__pycache__
