@@ -1,16 +1,21 @@
+/* ***************** Header / include files ( #include ) **********************/
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include "forest_data.h"
 #include "forest_data.c"
 
-int16_t branch_size = sizeof(depth_t)+sizeof(float)+sizeof(feature_t)+sizeof(next_node_t);
-int16_t leaf_size = sizeof(depth_t)+(sizeof(score_t)*NUM_CLASSES);
+/* *************** Constant / macro definitions ( #define ) *******************/
+const int16_t branch_size = sizeof(depth_t)+sizeof(float)+sizeof(feature_t)+sizeof(next_node_t);
+const int16_t leaf_size = sizeof(depth_t)+(sizeof(score_t)*NUM_CLASSES);
 
+/* *********************** Function prototypes ******************************/
+read_samples(char* file_name, FILE **read_file);
 float * predict(float_t samples[FEATURE_COUNT]);
 depth_t read_depth(uint8_t* ptr);
 branch_t read_branch(uint8_t* ptr);
@@ -19,15 +24,36 @@ uint32_t find_next_tree(uint8_t* ptr, uint32_t sz, uint32_t index);
 float * predict_proba(node_t * head);
 int predict_index(float * probs);
 
-int main(void)
+/* *********************** Function definitions ******************************/
+int main(int argc, char **argv)
 {
-    float_t samples[FEATURE_COUNT] = {0.22044,  0.440961,         -0.96901,         0.247022};
-    float * ret;
-    int index;
-    ret = predict(samples);
-    index = predict_index(ret);
-    printf("%s\n", classes[index]);    
+    // float_t samples[FEATURE_COUNT];
+    // float * ret;
+    // int index;
+    // ret = predict(samples);
+    // index = predict_index(ret);
+    FILE* read_file;
 
+    read_samples(argv[1], &read_file);
+
+
+
+    // printf("%s\n", classes[index]);    
+
+    return 0;
+}
+
+int read_samples(char* file_name, FILE **read_file)
+{
+    if(file_name == NULL)
+    {
+        return -1;
+    }
+    if ((read_file = fopen(file_name, "rb")) == NULL)
+    {
+        return -1;
+    }
+    
     return 0;
 }
 
