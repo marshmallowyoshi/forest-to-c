@@ -5,12 +5,12 @@ This script is used to convert the forest.csv file into a compact binary file fo
 import csv
 import numpy as np
 
-def forest_to_binary(file_name, binary_name, metadata, write_to_file=True):
+def forest_to_binary(file_name, binary_name, metadata:str, write_to_file=True):
     forest = csv.reader(open(file_name, 'r', encoding='utf-8-sig'), delimiter=',')
 
     if write_to_file:
         with open(binary_name, 'wb') as f:
-            f.write(byte_struct(forest, metadata_to_dict(metadata, [])))
+            f.write(byte_struct(forest, metadata_to_dict(metadata)))
         return 0
     else:
         return byte_struct(forest, metadata)
@@ -161,10 +161,10 @@ def metadata_to_dict(metadata):
     }
 
     # size in bytes
-    meta['branch_size'] = type_sizes[meta['depth_t']] + type_sizes[meta['threshold_t']] + type_sizes[meta['feature_t']] + meta['next_node_t']
+    meta['branch_size'] = type_sizes[meta['depth_t']] + type_sizes[meta['threshold_t']] + type_sizes[meta['feature_t']] + type_sizes[meta['next_node_t']]
     meta['leaf_size'] = type_sizes[meta['depth_t']] + (type_sizes[meta['score_t']]*meta['class_count'])
     max_byte_count = max(meta['leaf_size'], meta['branch_size'])*line_count
-    if  < 32768:
+    if max_byte_count < 32768:
         meta['next_node_t'] = 'int16_t'
     else:
         meta['next_node_t'] = 'int32_t'
@@ -184,7 +184,7 @@ def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='fore
     else:
         raise ValueError
 
-    meta = metadata_to_dict(metadata, byte_list)
+    meta = metadata_to_dict(metadata)
 
     with open(h_file, 'w', encoding='utf-8-sig') as f:
         f.write('#include <stdint.h>\n')

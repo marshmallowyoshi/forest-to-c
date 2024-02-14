@@ -15,7 +15,7 @@ const int16_t branch_size = sizeof(depth_t)+sizeof(float)+sizeof(feature_t)+size
 const int16_t leaf_size = sizeof(depth_t)+(sizeof(score_t)*NUM_CLASSES);
 
 /* *********************** Function prototypes ******************************/
-read_samples(char* file_name, FILE **read_file);
+int read_samples(char* file_name, FILE *read_file);
 float * predict(float_t samples[FEATURE_COUNT]);
 depth_t read_depth(uint8_t* ptr);
 branch_t read_branch(uint8_t* ptr);
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     // index = predict_index(ret);
     FILE* read_file;
 
-    read_samples(argv[1], &read_file);
+    read_samples(argv[1], read_file);
 
 
 
@@ -43,16 +43,18 @@ int main(int argc, char **argv)
     return 0;
 }
 
-int read_samples(char* file_name, FILE **read_file)
+int read_samples(char* file_name, FILE *read_file)
 {
     if(file_name == NULL)
     {
         return -1;
     }
-    if ((read_file = fopen(file_name, "rb")) == NULL)
+    read_file = fopen(file_name, "rb");
+    if (read_file == NULL)
     {
         return -1;
     }
+
     
     return 0;
 }
@@ -60,7 +62,7 @@ int read_samples(char* file_name, FILE **read_file)
 float * predict(float_t samples[FEATURE_COUNT])
 {
     // variables
-    uint8_t* fptr1;
+    uint8_t* fptr1 = NULL;
     uint32_t index = 0;
     branch_t new_branch;
     leaf_t new_leaf;
@@ -72,6 +74,10 @@ float * predict(float_t samples[FEATURE_COUNT])
     // nodes in linked list represent trees in forest
     node_t * head = NULL;
     head = (node_t *) malloc(NUM_CLASSES);
+
+    if (head == NULL) {
+        return NULL;
+    }
 
     head->next = NULL;
     node_t * current = head;
@@ -108,11 +114,16 @@ float * predict(float_t samples[FEATURE_COUNT])
         }
     }
     proba = predict_proba(head);
+
+    free(head);
     return proba;
 }
 
 depth_t read_depth(uint8_t* ptr)
 {
+    if (ptr == NULL) {
+        return -1;
+    }
     depth_t d;
     d = (depth_t)*ptr;
     return d;
