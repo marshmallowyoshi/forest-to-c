@@ -219,7 +219,6 @@ def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='fore
     with open(c_file, 'w', encoding='utf-8-sig') as f:
         # includes
         f.write('#include <stdint.h>\n')
-        f.write('#include "forest_data.h"\n')
 
         # data
         f.write(f'char *classes[{meta["class_count"]}] = ')
