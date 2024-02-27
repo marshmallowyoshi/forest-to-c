@@ -63,7 +63,7 @@ def byte_struct(forest, meta:dict):
             # depth and value
             depth = convert_number_to_bytes(-1 * int(row[0]), meta['depth_t']) #(-1 * int(row[0])).to_bytes(1, 'big', signed=True)
 
-            value = np.array([np.int16(x) for x in row[3].strip('.][').replace('\n', '').split(', ')]).tobytes()
+            value = b''.join([convert_number_to_bytes(int(x), meta['score_t']) for x in row[3].strip('.][').replace('\n', '').split(', ')])
         else:
             depth = convert_number_to_bytes(int(row[0]), meta['depth_t'])
 
@@ -77,7 +77,7 @@ def byte_struct(forest, meta:dict):
         all_bytes_list += [[depth, threshold, feature, value]]
 
     # create linked branch positions
-    all_bytes_list = live_traversal(all_bytes_list, branch_list)
+    all_bytes_list = live_traversal(all_bytes_list, branch_list, meta['next_node_t'])
     # final byte string
     all_bytes = b''.join([b''.join(x) for x in all_bytes_list])
     return all_bytes
@@ -96,22 +96,24 @@ def byte_count(
 def links_to_pointers(
     branches,
     all_bytes_list,
-    idx
+    idx,
+    next_node_t,
     ):
     if len(branches) != 2:
         return b''
     else:
         branch_idx = byte_count(all_bytes_list, idx, branches[1])
-        return np.int16(branch_idx).tobytes()
+        return convert_number_to_bytes(branch_idx, next_node_t)
 
 def live_traversal(
         all_bytes_list,
-        all_branches
+        all_branches,
+        next_node_t,
         ):
     live_bytes = all_bytes_list[::-1]
     live_branches = all_branches[::-1]
     for idx, branch in enumerate(live_branches):
-        live_bytes[idx] = live_bytes[idx] + [links_to_pointers(branch, live_bytes[::-1], len(live_bytes) - idx)]
+        live_bytes[idx] = live_bytes[idx] + [links_to_pointers(branch, live_bytes[::-1], len(live_bytes) - idx, next_node_t)]
     return live_bytes[::-1]
 
 def bytes_to_decimal(all_bytes):
@@ -138,7 +140,7 @@ def metadata_to_dict(metadata):
             'score_t': '',
             'branch_size': 0,
             'leaf_size': 0}
-    
+
     line_count = 0
     with open(metadata, 'r', encoding='utf-8-sig') as f:
         # read metadata
@@ -203,6 +205,9 @@ def metadata_to_dict(metadata):
     return meta
 
 def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='forest_data', byte_format='hex'):
+    """
+    Generate source and header files containing data and structure information.
+    """
 
     c_file = "".join((c_file_names, '.c'))
     h_file = "".join((c_file_names, '.h'))
@@ -250,7 +255,19 @@ def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='fore
         f.write(f'typedef {meta["depth_t"]} depth_t;\n')
         f.write(f'typedef {meta["feature_t"]} feature_t;\n')
         f.write(f'typedef {meta["next_node_t"]} next_node_t;\n')
-        f.write(f'typedef {meta["score_t"]} score_t;\n\n')
+        f.write(f'typedef {meta["score_t"]} score_t;\n')
+        
+        # Sample Structure
+        f.write('typedef struct {\n')
+        f.write('    float samples[FEATURE_COUNT];\n')
+        f.write('    int status;\n')
+        f.write('} samples_t;\n\n')
+
+        # Probability Structure
+        f.write('typedef struct {\n')
+        f.write('    float proba[NUM_CLASSES];\n')
+        f.write('    int status;\n')
+        f.write('} proba_t;\n\n')
 
         # Branch Structure
         f.write('typedef struct {\n')

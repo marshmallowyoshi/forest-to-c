@@ -48,3 +48,4 @@ def forest_to_c(rf: RandomForestClassifier,
     else:
         os.remove(csv_name)
         os.remove(meta_name)
+        return None
