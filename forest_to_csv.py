@@ -1,7 +1,6 @@
 import pandas as pd
-import numpy as np
-from sklearn.ensemble import RandomForestClassifier
-from sklearn import preprocessing, model_selection
+# from sklearn.ensemble import RandomForestClassifier
+# from sklearn import preprocessing, model_selection
 
 def tree_to_df(tree):
     tree_ = tree.tree_
@@ -35,7 +34,7 @@ def add_branches(tree):
     return tree
 
 def write_metadata(rf, file_name):
-    largest_sample_size = int(max([max(rf.estimators_[x].tree_.value[0][0]) for x in range(len(rf.estimators_))]))
+    largest_sample_size = int(max([max(rf.estimators_[x].tree_.n_node_samples) for x in range(len(rf.estimators_))]))
     feature_count = rf.n_features_in_
     tree_count = len(rf.estimators_)
     class_count = len(rf.classes_)
