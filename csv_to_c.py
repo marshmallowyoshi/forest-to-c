@@ -1,5 +1,6 @@
 """
-This script is used to convert the forest.csv file into a compact binary file for use in embedded systems.
+This script is used to convert the forest.csv file into a compact binary file for use in embedded
+systems.
 """
 
 import csv
@@ -17,12 +18,14 @@ def forest_to_binary(file_name:str, binary_name:str, metadata:str, write_to_file
         return 0
     else:
         return byte_struct(forest, metadata_to_dict(metadata))
-    
+
 def convert_number_to_bytes(number, byte_type:str):
-    """ Convert a number to a byte array.
+    """
+    Convert a number to a byte array.
     With the input byte_type being one of the following C types:
     int8_t, int16_t, int32_t, float_t
-    Returns the original number if given an invalid byte_type"""
+    Returns the original number if given an invalid byte_type
+    """
     match byte_type:
         case 'int8_t':
             return number.to_bytes(1, 'big', signed=True)
@@ -34,10 +37,11 @@ def convert_number_to_bytes(number, byte_type:str):
             return np.float32(number).tobytes()
         case _:
             return number
-        
 
 def byte_struct(forest, meta:dict):
-    """ Create a byte array from the forest structure"""
+    """
+    Create a byte array from the forest structure
+    """
     empty_bytes = b''
     all_bytes = empty_bytes
     all_bytes_list = []
@@ -61,15 +65,17 @@ def byte_struct(forest, meta:dict):
 
         if row[3] != '':
             # depth and value
-            depth = convert_number_to_bytes(-1 * int(row[0]), meta['depth_t']) #(-1 * int(row[0])).to_bytes(1, 'big', signed=True)
+            depth = convert_number_to_bytes(-1 * int(row[0]), meta['depth_t'])
 
-            value = b''.join([convert_number_to_bytes(int(x), meta['score_t']) for x in row[3].strip('.][').replace('\n', '').split(', ')])
+            value = b''.join([convert_number_to_bytes(int(x), meta['score_t'])
+                              for x in row[3].strip('.][').replace('\n', '').split(', ')])
         else:
             depth = convert_number_to_bytes(int(row[0]), meta['depth_t'])
 
             value = empty_bytes
 
         if row[4] != '':
+            # branches
             branch_list += [[int(x) for x in row[4].strip('][').split(', ')]]
         else:
             branch_list += [[]]
@@ -87,7 +93,9 @@ def byte_count(
         start_idx,
         end_idx
         ):
-    """ Get length of a range of bytes"""
+    """
+    Get length of a range of bytes
+    """
     counter = 0
     for idx in range(start_idx, end_idx):
         counter += sum([len(x) for x in all_bytes_list[idx]])
@@ -99,6 +107,9 @@ def links_to_pointers(
     idx,
     next_node_t,
     ):
+    """
+    Convert a branch index to a byte index.
+    """
     if len(branches) != 2:
         return b''
     else:
@@ -110,23 +121,34 @@ def live_traversal(
         all_branches,
         next_node_t,
         ):
+    """
+    Traverse byte list in reverse order to find byte indexes of all branch links.
+    """
     live_bytes = all_bytes_list[::-1]
     live_branches = all_branches[::-1]
     for idx, branch in enumerate(live_branches):
-        live_bytes[idx] = live_bytes[idx] + [links_to_pointers(branch, live_bytes[::-1], len(live_bytes) - idx, next_node_t)]
+        live_bytes[idx] += [links_to_pointers(branch, live_bytes[::-1],
+                                              len(live_bytes) - idx,
+                                              next_node_t)]
     return live_bytes[::-1]
 
-def bytes_to_decimal(all_bytes):
-    return [b for b in all_bytes]
-
 def bytes_to_hex(all_bytes):
+    """
+    Convert byte array to hex string
+    """
     return [hex(b) for b in all_bytes]
 
 def get_forest_structure(file_name):
+    """
+    Classify rows as branches or leaves.
+    """
     forest = csv.reader(open(file_name, 'r', encoding='utf-8-sig'), delimiter=',')
     return [True if row[4] != '' else False for row in forest][1:]
 
 def metadata_to_dict(metadata):
+    """
+    Open metadata file and save values to a dictionary.
+    """
     meta = {'largest_sample_size': 0,
             'feature_count': 0,
             'tree_count': 0,
@@ -178,9 +200,6 @@ def metadata_to_dict(metadata):
         meta['score_t'] = 'int32_t'
     # next node
     meta['next_node_t'] = 'int16_t'
-    
-
-    
 
     # map to types to sizes
     type_sizes = {
@@ -195,7 +214,8 @@ def metadata_to_dict(metadata):
                            + type_sizes[meta['threshold_t']]
                            + type_sizes[meta['feature_t']]
                            + type_sizes[meta['next_node_t']])
-    meta['leaf_size'] = type_sizes[meta['depth_t']] + (type_sizes[meta['score_t']]*meta['class_count'])
+    meta['leaf_size'] = type_sizes[meta['depth_t']] + (type_sizes[meta['score_t']]
+                                                       *meta['class_count'])
     max_byte_count = max(meta['leaf_size'], meta['branch_size'])*line_count
     if max_byte_count < 32768:
         meta['next_node_t'] = 'int16_t'
@@ -204,46 +224,17 @@ def metadata_to_dict(metadata):
 
     return meta
 
-def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='forest_data', byte_format='hex'):
+def write_to_header_file(meta, h_file):
     """
-    Generate source and header files containing data and structure information.
+    Writes the given metadata to the header file in the specified format.
+
+    Args:
+        meta (dict): The metadata to be written to the header file.
+        h_file (str): The path of the header file to write to.
+
+    Returns:
+        None
     """
-
-    c_file = "".join((c_file_names, '.c'))
-    h_file = "".join((c_file_names, '.h'))
-
-    if byte_format == 'hex':
-        byte_list = bytes_to_hex(all_bytes)
-    elif byte_format == 'decimal':
-        byte_list = bytes_to_decimal(all_bytes)
-    else:
-        raise ValueError
-
-    meta = metadata_to_dict(metadata)
-
-    with open(c_file, 'w', encoding='utf-8-sig') as f:
-        # includes
-        f.write('#include <stdint.h>\n')
-
-        # data
-        f.write(f'char *classes[{meta["class_count"]}] = ')
-        f.write('{')
-        for c in meta['classes']:
-            f.write(f'\"{c}\",\n')
-        f.write('};\n')
-
-        f.write('uint8_t forest_structure[] = {\n')
-        ptr = 0
-        for row in forest_structure:
-            if row:
-                vals = byte_list[ptr:ptr+meta['branch_size']]
-                ptr += meta['branch_size']
-            else:
-                vals = byte_list[ptr:ptr+meta['leaf_size']]
-                ptr += meta['leaf_size']
-            f.write(f'{",".join([str(x) for x in vals])},\n')
-        f.write('};\n')
-
     with open(h_file, 'w', encoding='utf-8-sig') as f:
         f.write('#include <stdint.h>\n')
         # Constants
@@ -256,7 +247,7 @@ def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='fore
         f.write(f'typedef {meta["feature_t"]} feature_t;\n')
         f.write(f'typedef {meta["next_node_t"]} next_node_t;\n')
         f.write(f'typedef {meta["score_t"]} score_t;\n')
-        
+
         # Sample Structure
         f.write('typedef struct {\n')
         f.write('    float samples[FEATURE_COUNT];\n')
@@ -288,4 +279,59 @@ def create_array_for_c(all_bytes, forest_structure, metadata, c_file_names='fore
         f.write('    score_t val[NUM_CLASSES];\n')
         f.write('    struct node * next;\n')
         f.write('} node_t;\n\n')
-    return 0
+
+def write_to_source_file(forest_structure, byte_list, meta, c_file):
+    """
+    Writes the forest structure, byte list, and meta information to the specified C file.
+
+    Parameters:
+    forest_structure (list): The structure of the forest.
+    byte_list (list): The list of bytes to be written.
+    meta (dict): Metadata containing class count, classes, branch size, and leaf size.
+    c_file (str): The path to the C file to write.
+
+    Returns:
+    None
+    """
+    with open(c_file, 'w', encoding='utf-8-sig') as f:
+        # includes
+        f.write('#include <stdint.h>\n')
+
+        # data
+        f.write(f'char *classes[{meta["class_count"]}] = ')
+        f.write('{')
+        for c in meta['classes']:
+            f.write(f'\"{c}\",\n')
+        f.write('};\n')
+
+        f.write('uint8_t forest_structure[] = {\n')
+        ptr = 0
+        for row in forest_structure:
+            if row:
+                vals = byte_list[ptr:ptr+meta['branch_size']]
+                ptr += meta['branch_size']
+            else:
+                vals = byte_list[ptr:ptr+meta['leaf_size']]
+                ptr += meta['leaf_size']
+            f.write(f'{",".join([str(x) for x in vals])},\n')
+        f.write('};\n')
+
+def create_array_for_c(all_bytes,
+                       forest_structure,
+                       metadata,
+                       c_file_names='forest_data'):
+    """
+    Generate source and header files containing data and structure information.
+    """
+
+    c_file = "".join((c_file_names, '.c'))
+    h_file = "".join((c_file_names, '.h'))
+
+    byte_list = bytes_to_hex(all_bytes)
+
+    meta = metadata_to_dict(metadata)
+
+    write_to_source_file(forest_structure, byte_list, meta, c_file)
+    write_to_header_file(meta, h_file)
+
+    return None
